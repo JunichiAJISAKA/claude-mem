@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Fixed
+
+- Semantic prompt injection now remembers observation IDs per Claude Code session in SQLite, skips already-injected matches, and backfills from lower-ranked novel results up to the configured limit. Set `CLAUDE_MEM_SEMANTIC_INJECT_DEDUP=false` to restore the previous repeated-injection behavior.
+
 ## [13.11.0] - 2026-07-13
 
 ## Worker-native cloud sync (PR #3182)

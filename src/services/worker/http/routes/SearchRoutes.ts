@@ -15,6 +15,8 @@ import { USER_SETTINGS_PATH } from '../../../../shared/paths.js';
 import type { ObservationSearchResult, SessionSummarySearchResult } from '../../../sqlite/types.js';
 import { captureEvent } from '../../../telemetry/telemetry.js';
 import { telemetryBuffer } from '../../../telemetry/buffer.js';
+import { SEARCH_CONSTANTS } from '../../search/index.js';
+import { claimNovelSemanticInjectObservationIds } from '../../../sqlite/semantic-inject-dedup.js';
 
 const ONBOARDING_EXPLAINER_PATH: string = path.resolve(__dirname, '../skills/how-it-works/onboarding-explainer.md');
 
@@ -62,6 +64,9 @@ const semanticContextSchema = z.object({
   limit: z.union([z.string(), z.number()]).optional(),
   platformSource: z.string().optional(),
   platform_source: z.string().optional(),
+  sessionId: z.string().optional(),
+  session_id: z.string().optional(),
+  dedup: z.union([z.boolean(), z.string()]).optional(),
 }).passthrough();
 
 export class SearchRoutes extends BaseRouteHandler {
@@ -366,6 +371,13 @@ export class SearchRoutes extends BaseRouteHandler {
     const project = SearchRoutes.firstString(req.body?.project) ?? SearchRoutes.firstString(req.query.project);
     const limit = Math.min(Math.max(parseInt(String(req.body?.limit || req.query.limit || '5'), 10) || 5, 1), 20);
     const platformSource = this.getOptionalPlatformSourceFromRequest(req);
+    const sessionId = SearchRoutes.firstString(req.body?.sessionId)
+      ?? SearchRoutes.firstString(req.body?.session_id);
+    const dedupRaw = req.body?.dedup;
+    const dedupRequested = typeof dedupRaw === 'boolean'
+      ? dedupRaw
+      : String(dedupRaw ?? 'true').toLowerCase() !== 'false';
+    const dedupEnabled = dedupRequested && sessionId !== undefined;
 
     if (!query || query.length < 20) {
       res.json({ context: '', count: 0 });
@@ -378,7 +390,7 @@ export class SearchRoutes extends BaseRouteHandler {
         query,
         type: 'observations',
         project,
-        limit: String(limit),
+        limit: String(dedupEnabled ? SEARCH_CONSTANTS.CHROMA_BATCH_SIZE : limit),
         format: 'json',
         ...(platformSource ? { platformSource } : {}),
       });
@@ -389,21 +401,54 @@ export class SearchRoutes extends BaseRouteHandler {
       return;
     }
 
-    const observations = result?.observations || [];
+    const observations: ObservationSearchResult[] = result?.observations || [];
     if (!observations.length) {
       res.json({ context: '', count: 0 });
       return;
     }
 
+    let selectedObservations = observations.slice(0, limit);
+    if (dedupEnabled) {
+      try {
+        const selectedIds = claimNovelSemanticInjectObservationIds(
+          this.searchManager.getSessionStore().db,
+          sessionId,
+          observations.map(observation => observation.id),
+          limit,
+        );
+        const observationById = new Map(observations.map(observation => [observation.id, observation]));
+        selectedObservations = selectedIds
+          .map(id => observationById.get(id))
+          .filter((observation): observation is ObservationSearchResult => observation !== undefined);
+      } catch (error) {
+        const normalizedError = error instanceof Error ? error : new Error(String(error));
+        logger.error('HTTP', 'Semantic context dedup claim failed', {
+          project,
+          platformSource,
+          candidateCount: observations.length,
+        }, normalizedError);
+        res.json({ context: '', count: 0 });
+        return;
+      }
+    }
+
+    if (!selectedObservations.length) {
+      res.json({ context: '', count: 0 });
+      return;
+    }
+
     const lines: string[] = ['## Relevant Past Work (semantic match)\n'];
-    for (const obs of observations.slice(0, limit)) {
+    for (const obs of selectedObservations) {
       const date = obs.created_at?.slice(0, 10) || '';
       lines.push(`### ${obs.title || 'Observation'} (${date})`);
       if (obs.narrative) lines.push(obs.narrative);
       lines.push('');
     }
 
-    res.json({ context: lines.join('\n'), count: observations.length });
+    res.json({
+      context: lines.join('\n'),
+      count: dedupEnabled ? selectedObservations.length : observations.length,
+    });
   });
 
   private queryWithPlatformSource(req: Request): Record<string, any> {

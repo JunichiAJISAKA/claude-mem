@@ -349,6 +349,7 @@ describe('SettingsDefaultsManager', () => {
 
       expect(defaults.CLAUDE_MEM_DATA_DIR).toBeDefined();
       expect(defaults.CLAUDE_MEM_LOG_LEVEL).toBeDefined();
+      expect(defaults.CLAUDE_MEM_SEMANTIC_INJECT_DEDUP).toBe('true');
     });
   });
 

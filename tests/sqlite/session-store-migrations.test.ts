@@ -483,12 +483,23 @@ describe('SessionStore migrations', () => {
 
   it('fresh-DB init creates the SessionStore core tables', () => {
     store = new SessionStore(':memory:');
-    const expected = ['schema_versions', 'sdk_sessions', 'observations', 'session_summaries', 'user_prompts', 'pending_messages'];
+    const expected = [
+      'schema_versions',
+      'sdk_sessions',
+      'observations',
+      'session_summaries',
+      'user_prompts',
+      'pending_messages',
+      'semantic_inject_history',
+    ];
 
     for (const table of expected) {
       const row = store.db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`).get(table) as { name: string } | undefined;
       expect(row?.name).toBe(table);
     }
+
+    const migration = store.db.prepare('SELECT version FROM schema_versions WHERE version = 41').get() as { version: number } | undefined;
+    expect(migration?.version).toBe(41);
   });
 
   it('applies required SQLite pragmas to injected worker and search connections', () => {
