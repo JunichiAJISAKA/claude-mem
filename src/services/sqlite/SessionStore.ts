@@ -18,6 +18,7 @@ import { DEFAULT_PLATFORM_SOURCE, normalizePlatformSource, sortPlatformSources }
 import { findRecentDuplicateUserPrompt as findRecentDuplicateUserPromptRecord } from './prompts/get.js';
 import { normalizeStoredPromptText } from './prompt-storage.js';
 import { applySqliteConnectionPragmas } from './connection.js';
+import { ensureSemanticInjectDedupSchema } from './semantic-inject-dedup.js';
 
 interface IndexColumnInfo {
   seqno: number;
@@ -109,6 +110,11 @@ export class SessionStore {
     this.ensurePendingMessagesSessionToolUniqueIndex();
     this.ensureSyncedAtColumns(options.cloudSyncStatePath ?? paths.cloudSyncState());
     this.requeuePromptCloudSyncAfterMapperFix();
+    this.ensureSemanticInjectHistoryTable();
+  }
+
+  private ensureSemanticInjectHistoryTable(): void {
+    ensureSemanticInjectDedupSchema(this.db);
   }
 
   private getIndexColumns(indexName: string): string[] {

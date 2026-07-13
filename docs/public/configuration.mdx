@@ -23,6 +23,18 @@ Settings are managed in `~/.claude-mem/settings.json`. The file is auto-created 
 | `CLAUDE_MEM_DATA_DIR`         | `~/.claude-mem`                 | Data root — every other path (database, chroma, logs, settings.json, worker.pid) derives from this |
 | `CLAUDE_MEM_SKIP_TOOLS`       | `ListMcpResourcesTool,SlashCommand,Skill,TodoWrite,AskUserQuestion` | Comma-separated tools to exclude from observations |
 
+### Semantic Prompt Injection
+
+Semantic prompt injection is experimental and disabled by default. When enabled, the `UserPromptSubmit` hook asks the worker for observations relevant to each non-trivial prompt.
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| `CLAUDE_MEM_SEMANTIC_INJECT` | `false` | Inject semantically relevant observations on each `UserPromptSubmit` |
+| `CLAUDE_MEM_SEMANTIC_INJECT_LIMIT` | `5` | Maximum observations injected for one prompt (1-20) |
+| `CLAUDE_MEM_SEMANTIC_INJECT_DEDUP` | `true` | Skip observations already injected in the same Claude Code session and backfill with the next-ranked novel matches |
+
+Dedup state is stored in the worker's SQLite database, survives worker restarts, and is pruned after roughly seven days. Set `CLAUDE_MEM_SEMANTIC_INJECT_DEDUP` to `false` to restore repeated injection of the same top-ranked observations.
+
 ### Gemini Provider Settings
 
 | Setting                       | Default                         | Description                           |

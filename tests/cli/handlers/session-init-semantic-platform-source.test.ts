@@ -23,6 +23,7 @@ mock.module('../../../src/shared/SettingsDefaultsManager.js', () => ({
       CLAUDE_MEM_RUNTIME: 'worker',
       CLAUDE_MEM_SEMANTIC_INJECT: 'true',
       CLAUDE_MEM_SEMANTIC_INJECT_LIMIT: '7',
+      CLAUDE_MEM_SEMANTIC_INJECT_DEDUP: 'true',
     }),
   },
 }));
@@ -33,6 +34,7 @@ mock.module('../../../src/shared/hook-settings.js', () => ({
     CLAUDE_MEM_RUNTIME: 'worker',
     CLAUDE_MEM_SEMANTIC_INJECT: 'true',
     CLAUDE_MEM_SEMANTIC_INJECT_LIMIT: '7',
+    CLAUDE_MEM_SEMANTIC_INJECT_DEDUP: 'true',
   }),
 }));
 
@@ -95,6 +97,7 @@ describe('sessionInitHandler semantic injection platform source', () => {
           CLAUDE_MEM_RUNTIME: 'worker',
           CLAUDE_MEM_SEMANTIC_INJECT: 'true',
           CLAUDE_MEM_SEMANTIC_INJECT_LIMIT: '7',
+          CLAUDE_MEM_SEMANTIC_INJECT_DEDUP: 'true',
         }),
         resolveRuntimeContext: () => ({ runtime: 'worker' }),
         shouldTrackProject: () => true,
@@ -117,7 +120,8 @@ describe('sessionInitHandler semantic injection platform source', () => {
       if (!semanticCall) throw new Error('semantic call missing: ' + JSON.stringify(workerCallLog));
       if (semanticCall.method !== 'POST') throw new Error('semantic method mismatch: ' + semanticCall.method);
       const body = semanticCall.body;
-      if (body.q !== ${JSON.stringify(prompt)} || body.limit !== '7' || body.platformSource !== 'codex') {
+      if (body.q !== ${JSON.stringify(prompt)} || body.limit !== '7' || body.platformSource !== 'codex' ||
+          body.sessionId !== 'session-semantic-platform' || body.dedup !== true) {
         throw new Error('semantic body mismatch: ' + JSON.stringify(body));
       }
     `;
